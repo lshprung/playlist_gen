@@ -14,16 +14,24 @@ our %columns = (
 
 # Variables to be set by user (TODO)
 our $music_dir = File::HomeDir->my_home . "/Music/";
+our %extensions = (
+	flac => '1',
+	mp3 => '1',
+	ogg => '1'
+);
 
 
-# Scan a directory recursively, return an array of files (optionally, matching a certain file extension or extensions TODO)
-sub scan_dir {
+# Scan a directory recursively, return an array of files (optionally, matching a certain file extension or extensions)
+# 	@_[0] -> $music_dir
+# 	@_[1] -> hash of file extensions to scan for
+sub get_files {
 	my @file_list;
+	my @file_split;
 
 	# Remove extra /'s from the end of $_[0]
 	$_[0] =~ s/\/+$//g;
 	my $dir_path = $_[0];
-	my @extensions = $_[1]; #TODO
+	my $extensions = $_[1];
 
 	opendir my $dh, "$dir_path" or die "$!";
 	while (my $file = readdir($dh)) {
@@ -33,11 +41,15 @@ sub scan_dir {
 		}
 
 		if (-d "$dir_path/$file"){
-			push(@file_list, scan_dir("$dir_path/$file", @extensions));
+			push(@file_list, get_files("$dir_path/$file", %extensions));
 		}
 
 		elsif (-f "$dir_path/$file" and -r "$dir_path/$file"){
-			push(@file_list, "$dir_path/$file");
+			# Check that the extension matches
+			@file_split = split /\./, "$dir_path/$file";
+			if (defined $extensions{"$file_split[-1]"} and $extensions{"$file_split[-1]"} == 1){
+				push(@file_list, "$dir_path/$file");
+			}
 		}
 	}
 
@@ -64,7 +76,7 @@ if (! -d $music_dir){
 
 # Look through files in $music_dir
 print "Looking through files in $music_dir\n";
-my @file_list = scan_dir($music_dir);
+my @file_list = get_files($music_dir, %extensions);
 for my $i (sort @file_list){
 	print "$i\n";
 }
