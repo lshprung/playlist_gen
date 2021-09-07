@@ -74,9 +74,22 @@ if (! -d $music_dir){
 	die "Error: \"$music_dir\" is not a directory\n";
 }
 
-# Look through files in $music_dir
+# Get a list of files in $music_dir
 print "Looking through files in $music_dir\n";
 my @file_list = get_files($music_dir, %extensions);
+# DEBUG
 for my $i (sort @file_list){
 	print "$i\n";
+}
+
+# Connect to sqlite database created in the base of $music_dir
+ 
+# Get tags for each file
+my $data;
+for my $file (sort @file_list){
+	$data = Audio::Scan->scan("$file");
+	$data = $data->{tags};
+	for my $i (keys %$data){
+		print "$i -> $data->{$i}\n";
+	}
 }
