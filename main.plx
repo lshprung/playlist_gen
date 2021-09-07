@@ -1,24 +1,44 @@
 #!/usr/bin/perl
 
-use warnings;
 use strict;
+use warnings;
 use utf8;
+use DBI;
 use Audio::Scan;
 use File::HomeDir;
 
 
 # Keep track of columns that need to be created in the database
-our %columns = (
-	ID => '1'
-);
+our %columns;
 
 # Variables to be set by user (TODO)
 our $music_dir = File::HomeDir->my_home . "/Music/";
+our $dbname = "library.db";
+our $table_name = "LIBRARY";
 our %extensions = (
 	flac => '1',
 	mp3 => '1',
 	ogg => '1'
 );
+
+my $data;      #Hold info from Audio::Scan
+my $statement; #Hold statements for sqlite
+
+
+# Wrapper to handle sqlite commands
+# 	@_[0]            -> database handle
+# 	@_[1]            -> command/statement
+# 	@_[2] (optional) -> output statement
+sub db_cmd {
+	my $rv = $_[0]->do($_[1]);
+	if ($rv < 0){
+		die $DBI::errstr;
+	}
+
+	if (defined $_[2]){
+		print "$_[2]\n";
+	}
+}
 
 
 # Scan a directory recursively, return an array of files (optionally, matching a certain file extension or extensions)
@@ -82,14 +102,36 @@ for my $i (sort @file_list){
 	print "$i\n";
 }
 
-# Connect to sqlite database created in the base of $music_dir
- 
-# Get tags for each file
-my $data;
-for my $file (sort @file_list){
+# Append tags to %columns
+for my $file (@file_list){
 	$data = Audio::Scan->scan("$file");
 	$data = $data->{tags};
 	for my $i (keys %$data){
-		print "$i -> $data->{$i}\n";
+		$columns{$i} = '1';
 	}
 }
+# DEBUG
+for my $i (keys %columns){
+	print "$i\n";
+}
+
+# Connect to sqlite database created in the base of $music_dir
+my $dbh = DBI->connect("DBI:SQLite:dbname=$music_dir/$dbname", "", "", { RaiseError => 1}) or die $DBI::errstr;
+print "Opened database successfully\n";
+
+# Create table in the database
+$statement = "CREATE TABLE $table_name 
+(ID INT PRIMARY KEY NOT NULL);";
+db_cmd($dbh, $statement, "Created table successfully");
+ 
+# Get tags for each file
+#for my $file (sort @file_list){
+#	$data = Audio::Scan->scan("$file");
+#	$data = $data->{tags};
+#	for my $i (keys %$data){
+#		print "$i -> $data->{$i}\n";
+#	}
+#}
+
+# Disconnect from sqlite database
+$dbh->disconnect();
