@@ -102,6 +102,15 @@ for my $i (sort @file_list){
 	print "$i\n";
 }
 
+# Get tags for each file
+#for my $file (sort @file_list){
+#	$data = Audio::Scan->scan("$file");
+#	$data = $data->{tags};
+#	for my $i (keys %$data){
+#		print "$i -> $data->{$i}\n";
+#	}
+#}
+
 # Append tags to %columns
 for my $file (@file_list){
 	$data = Audio::Scan->scan("$file");
@@ -119,19 +128,33 @@ for my $i (keys %columns){
 my $dbh = DBI->connect("DBI:SQLite:dbname=$music_dir/$dbname", "", "", { RaiseError => 1}) or die $DBI::errstr;
 print "Opened database successfully\n";
 
-# Create table in the database
-$statement = "CREATE TABLE $table_name 
-(ID INT PRIMARY KEY NOT NULL);";
-db_cmd($dbh, $statement, "Created table successfully");
- 
-# Get tags for each file
-#for my $file (sort @file_list){
-#	$data = Audio::Scan->scan("$file");
-#	$data = $data->{tags};
-#	for my $i (keys %$data){
-#		print "$i -> $data->{$i}\n";
-#	}
-#}
+# Overwrite $table_name if it exists (TODO alert user to overwrite)
+# TODO create option to append to table, instead of overwriting
+$statement = "DROP TABLE if EXISTS $table_name";
+db_cmd($dbh, $statement, "Overwriting table \"$table_name\"");
 
+# Create table $table_name in the database with columns from %columns
+# Need to create additional columns for ID and PATH
+$statement = "CREATE TABLE $table_name 
+(ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+PATH TEXT NOT NULL";
+for my $i (keys %columns){
+	$statement = $statement . ",
+	\"$i\" TEXT";
+}
+$statement = $statement . ");";
+db_cmd($dbh, $statement, "Created table successfully");
+
+# Add each file from @file_list to the table
+$statement = "INSERT INTO $table_name(PATH)
+VALUES";
+for my $file (@file_list){
+	$statement = $statement . "(\"$file\"),";
+}
+$statement =~ s/[,]$/;/g;
+db_cmd($dbh, $statement);
+
+# Set each file's tags in the table
+ 
 # Disconnect from sqlite database
 $dbh->disconnect();
