@@ -101,9 +101,10 @@ sub print_help {
 Generate a database for audio files in DIRECTORY (by default ~/Music).
 
 Options:
-  -a, --append		Append to database file, instead of overwriting it
-  -h, --help		display this help and exit
-  -o, --output FILE	specify output file for database (default is library.db at the root of DIRECTORY)
+  -a, --append			append to database file, instead of overwriting it
+  -h, --help			display this help and exit
+  -o, --output FILE		specify output file for database (default is library.db at the root of DIRECTORY)
+  -t, --table-name TABLE	specify table name in database file (default is LIBRARY)
 ";
 }
 
@@ -132,6 +133,11 @@ for (my $i = 0; $i <= $#ARGV; $i++){
 		$i++;
 		$dbname = "$ARGV[$i]";
 		$options{output} = 1;
+	}
+
+	elsif ($ARGV[$i] =~ /-t|--table-name/){
+		$i++;
+		$table_name = $ARGV[$i];
 	}
 
 	elsif ($ARGV[$i] =~ /^[^-]/){
