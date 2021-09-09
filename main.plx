@@ -13,12 +13,17 @@ our %columns;
 
 # Variables to be set by user (TODO)
 our $music_dir = File::HomeDir->my_home . "/Music/";
-our $dbname = "library.db";
+our $dbname;
 our $table_name = "LIBRARY";
 our %extensions = (
 	flac => '1',
 	mp3 => '1',
 	ogg => '1'
+);
+
+# Keep track of options that have been set
+our %options = (
+	output => 0
 );
 
 my %data;      #Hold info from Audio::Scan
@@ -85,6 +90,20 @@ sub get_files {
 	return @file_list;
 }
 
+# Print a help message
+sub print_help {
+	print
+"Usage:
+  $0 [OPTION]... [DIRECTORY]
+
+Generate a database for audio files in DIRECTORY (by default ~/Music).
+
+Options:
+  -h, --help		display this help and exit
+  -o, --output FILE	specify output file for database (default is library.db at the root of DIRECTORY)
+";
+}
+
 # Test scan for Audio::Scan module
 sub scan_test {
 	my $data = Audio::Scan->scan("/home/louie/Music/Bjork/Debut/01 Human Behaviour.flac");
@@ -95,7 +114,29 @@ sub scan_test {
 }
 
 
-# TODO parse flags and arguments
+# parse flags and arguments
+for my $i (0..$#ARGV-1){
+	if ($ARGV[$i] =~ /-h|--help/){
+		print_help();
+		exit;
+	}
+
+	elsif ($ARGV[$i] =~ /-o|--output/){
+		$i++;
+		$dbname = "$ARGV[$i]";
+		$options{output} = 1;
+	}
+
+	elsif ($ARGV[$i] =~ /^[^-]/){
+		$music_dir = "$ARGV[$i]";
+		last;
+	}
+}
+
+$music_dir =~ s/\/$//;
+if (!$options{output}){
+	$dbname = $music_dir . "/library.db";
+}
 
 # Test to ensure $music_dir is a valid directory
 if (! -d $music_dir){
@@ -134,7 +175,7 @@ for my $i (keys %columns){
 }
 
 # Connect to sqlite database created in the base of $music_dir
-my $dbh = DBI->connect("DBI:SQLite:dbname=$music_dir/$dbname", "", "", { RaiseError => 1}) or die $DBI::errstr;
+my $dbh = DBI->connect("DBI:SQLite:dbname=$dbname", "", "", { RaiseError => 1}) or die $DBI::errstr;
 print "Opened database successfully\n";
 
 # Overwrite $table_name if it exists (TODO alert user to overwrite)
