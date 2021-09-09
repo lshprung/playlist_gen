@@ -21,9 +21,17 @@ our %extensions = (
 	ogg => '1'
 );
 
-my $data;      #Hold info from Audio::Scan
+my %data;      #Hold info from Audio::Scan
 my $statement; #Hold statements for sqlite
 
+
+# Wrapper to handle calls to Audio::Scan->scan(); returns tags hash
+# 	@_[0] -> file to scan
+sub audio_scan {
+	my $data = Audio::Scan->scan("$_[0]");
+	$data = $data->{tags};
+	return %$data;
+}
 
 # Wrapper to handle sqlite commands
 # 	@_[0]            -> database handle
@@ -113,9 +121,10 @@ for my $i (sort @file_list){
 
 # Append tags to %columns
 for my $file (@file_list){
-	$data = Audio::Scan->scan("$file");
-	$data = $data->{tags};
-	for my $i (keys %$data){
+	#$data = Audio::Scan->scan("$file");
+	#$data = $data->{tags};
+	%data = audio_scan("$file");
+	for my $i (keys %data){
 		$columns{$i} = '1';
 	}
 }
@@ -138,7 +147,7 @@ db_cmd($dbh, $statement, "Overwriting table \"$table_name\"");
 $statement = "CREATE TABLE $table_name 
 (ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
 PATH TEXT NOT NULL";
-for my $i (keys %columns){
+for my $i (sort(keys %columns)){
 	$statement = $statement . ",
 	\"$i\" TEXT";
 }
@@ -155,6 +164,28 @@ $statement =~ s/[,]$/;/g;
 db_cmd($dbh, $statement);
 
 # Set each file's tags in the table
+# TODO handle array tags (such as genre)
+for my $file (@file_list){
+	$statement = "UPDATE $table_name
+	SET ";
+
+	%data = audio_scan("$file");
+
+	# Loop to add all the columns for $statement
+	for my $i (sort(keys %data)){
+		next if $i eq "MCDI"; #FIXME MCDI field creates issues
+		$data{$i} =~ s/\"/\'\'/g;
+		$statement = $statement . "\"$i\" = \"$data{$i}\",";
+	}
+	$statement =~ s/[,]$/\n/g;
+
+	# Specify this insertion is for $file only
+	$statement = $statement . "WHERE PATH = \"$file\";";
+
+	#FIXME MCDI tag is binary. This should be considered and handled in a secondary file
+	db_cmd($dbh, $statement, "Updated tags for $file");
+}
+
  
 # Disconnect from sqlite database
 $dbh->disconnect();
