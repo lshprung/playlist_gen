@@ -11,7 +11,7 @@ use File::HomeDir;
 # Keep track of columns that need to be created in the database
 our %columns;
 
-# Variables to be set by user (TODO)
+# Variables to be set by user
 our $music_dir = File::HomeDir->my_home . "/Music/";
 our $dbname;
 our $table_name = "LIBRARY";
@@ -23,6 +23,7 @@ our %extensions = (
 
 # Keep track of options that have been set
 our %options = (
+	append => 0,
 	output => 0
 );
 
@@ -51,6 +52,8 @@ sub db_cmd {
 	if (defined $_[2]){
 		print "$_[2]\n";
 	}
+
+	return $rv;
 }
 
 
@@ -62,7 +65,6 @@ sub get_files {
 	my @file_split;
 
 	# Remove extra /'s from the end of $_[0]
-	$_[0] =~ s/\/+$//g;
 	my $dir_path = $_[0];
 	my $extensions = $_[1];
 
@@ -99,6 +101,7 @@ sub print_help {
 Generate a database for audio files in DIRECTORY (by default ~/Music).
 
 Options:
+  -a, --append		Append to database file, instead of overwriting it
   -h, --help		display this help and exit
   -o, --output FILE	specify output file for database (default is library.db at the root of DIRECTORY)
 ";
@@ -115,8 +118,12 @@ sub scan_test {
 
 
 # parse flags and arguments
-for my $i (0..$#ARGV-1){
-	if ($ARGV[$i] =~ /-h|--help/){
+for (my $i = 0; $i <= $#ARGV; $i++){
+	if ($ARGV[$i] =~ /-a|--append/){
+		$options{append} = 1;
+	}
+
+	elsif ($ARGV[$i] =~ /-h|--help/){
 		print_help();
 		exit;
 	}
@@ -133,7 +140,8 @@ for my $i (0..$#ARGV-1){
 	}
 }
 
-$music_dir =~ s/\/$//;
+# Remove trailing '/' from $music_dir and handle if $dbname was not set by the user
+$music_dir =~ s/\/+$//g;
 if (!$options{output}){
 	$dbname = $music_dir . "/library.db";
 }
@@ -179,21 +187,35 @@ my $dbh = DBI->connect("DBI:SQLite:dbname=$dbname", "", "", { RaiseError => 1}) 
 print "Opened database successfully\n";
 
 # Overwrite $table_name if it exists (TODO alert user to overwrite)
-# TODO create option to append to table, instead of overwriting
-$statement = "DROP TABLE if EXISTS $table_name";
-db_cmd($dbh, $statement, "Overwriting table \"$table_name\"");
+# TODO fix rows with non-ascii characters. These rows do not have any metadata filled in
+# If --append flag was passed, skip this step
+if (!$options{append}){
+	$statement = "DROP TABLE if EXISTS $table_name";
+	db_cmd($dbh, $statement, "Overwriting table \"$table_name\"");
 
-# Create table $table_name in the database with columns from %columns
-# Need to create additional columns for ID and PATH
-$statement = "CREATE TABLE $table_name 
-(ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-PATH TEXT NOT NULL";
-for my $i (sort(keys %columns)){
-	$statement = $statement . ",
-	\"$i\" TEXT";
+	# Create table $table_name in the database with columns from %columns
+	# Need to create additional columns for ID and PATH
+	$statement = "CREATE TABLE $table_name 
+	(ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+	PATH TEXT NOT NULL";
+	for my $i (sort(keys %columns)){
+		$statement = $statement . ",
+		\"$i\" TEXT";
+	}
+	$statement = $statement . ");";
+	db_cmd($dbh, $statement, "Created table successfully");
 }
-$statement = $statement . ");";
-db_cmd($dbh, $statement, "Created table successfully");
+
+# If appending, add columns where necessary
+else {
+	for my $i (sort(keys %columns)){
+		$statement = "SELECT COUNT(*) AS CNTREC FROM pragma_table_info('$table_name') WHERE name=\"$i\";";
+		if (db_cmd($dbh, $statement) > 0){
+			$statement = "ALTER TABLE $table_name ADD COLUMN \"$i\";";
+			db_cmd($dbh, $statement);
+		}
+	}
+}
 
 # Add each file from @file_list to the table
 $statement = "INSERT INTO $table_name(PATH)
