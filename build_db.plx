@@ -28,6 +28,26 @@ my %data;      #Hold info from Audio::Scan
 my $statement; #Hold statements for sqlite
 
 
+# Handle digging into non-scalar tags
+# 	@_[0] -> array tag
+sub array_handler {
+	my $output = "";
+
+	for my $i (@_){
+		# If another array, recursively handle
+		if (ref($i) eq 'ARRAY'){
+			$output = $output . array_handler(@$i);
+		}
+
+		# If scalar, append to output normally
+		elsif (!ref($i)){
+			$output = $output . "$i;";
+		}
+	}
+
+	return $output;
+}
+
 # Wrapper to handle calls to Audio::Scan->scan(); returns tags hash
 # 	@_[0] -> file to scan
 sub audio_scan {
@@ -265,7 +285,18 @@ for my $file (@file_list){
 	for my $i (sort(keys %data)){
 		next if $i eq "MCDI"; #FIXME MCDI field creates issues
 		$data{$i} =~ s/\"/\'\'/g;
-		$statement = $statement . "\"$i\" = \"$data{$i}\",";
+		$statement = $statement . "\"$i\" = \"";
+
+		# If tag is an array, encode the array into semicolon-separated string
+		if (ref($data{$i}) eq 'ARRAY'){
+			$statement = $statement . array_handler($data{$i});
+			$statement =~ s/[;]+$//g;
+			$statement = $statement . "\",";
+		}
+
+		else {
+			$statement = $statement . "$data{$i}\",";
+		}
 	}
 	$statement =~ s/[,]$/\n/g;
 
