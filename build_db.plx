@@ -21,7 +21,8 @@ our %extensions;
 # Keep track of options that have been set
 our %options = (
 	append => 0,
-	output => 0
+	output => 0,
+	quiet  => 0
 );
 
 my %data;      #Hold info from Audio::Scan
@@ -73,7 +74,8 @@ sub db_cmd {
 		die $DBI::errstr;
 	}
 
-	if (defined $_[2]){
+	# DEBUG
+	if (!$options{quiet} and defined $_[2]){
 		print "$_[2]\n";
 	}
 
@@ -107,6 +109,11 @@ sub get_files {
 			# Check that the extension matches
 			@file_split = split /\./, "$dir_path/$file";
 			if (defined $extensions{"$file_split[-1]"} and $extensions{"$file_split[-1]"} == 1){
+				# DEBUG
+				if (!$options{quiet}){
+					print "Found $dir_path/$file\n";
+				}
+
 				push(@file_list, "$dir_path/$file");
 			}
 		}
@@ -129,17 +136,9 @@ Options:
   -e, --extension EXTENSIONS	Set file extensions to look for, separated by commas (default is flac,mp3,ogg)
   -h, --help			display this help and exit
   -o, --output FILE		specify output file for database (default is library.db at the root of DIRECTORY)
+  -q, --quiet			quiet (no output)
   -t, --table-name TABLE	specify table name in database file (default is LIBRARY)
 ";
-}
-
-# Test scan for Audio::Scan module
-sub scan_test {
-	my $data = Audio::Scan->scan("/home/louie/Music/Bjork/Debut/01 Human Behaviour.flac");
-	$data = $data->{tags};
-	for (keys %$data){
-		print "$_ -> $data->{$_}\n";
-	}
 }
 
 
@@ -163,6 +162,10 @@ for (my $i = 0; $i <= $#ARGV; $i++){
 		$i++;
 		$dbname = "$ARGV[$i]";
 		$options{output} = 1;
+	}
+
+	elsif ($ARGV[$i] =~ /-q|--quiet/){
+		$options{quiet} = 1;
 	}
 
 	elsif ($ARGV[$i] =~ /-t|--table-name/){
@@ -193,48 +196,41 @@ if (! -d $music_dir){
 # Build the extensions hash for use in get_files
 build_extension_hash();
 
-# Get a list of files in $music_dir
-print "Looking through files in $music_dir\n";
-my @file_list = get_files($music_dir, %extensions);
 # DEBUG
-for my $i (sort @file_list){
-	print "$i\n";
+if (!$options{quiet}){
+	print "Looking through files in $music_dir\n";
 }
+
+# Get a list of files in $music_dir
+my @file_list = get_files($music_dir, %extensions);
 
 # Quit if @file_list is empty
 if ($#file_list < 1){
 	die "Error: Could not find any files in \"$music_dir\" matching extension(s) \"$extensions_list\"\n";
 }
 
-# Get tags for each file
-#for my $file (sort @file_list){
-#	$data = Audio::Scan->scan("$file");
-#	$data = $data->{tags};
-#	for my $i (keys %$data){
-#		print "$i -> $data->{$i}\n";
-#	}
-#}
-
 # Append tags to %columns
 for my $file (@file_list){
-	#$data = Audio::Scan->scan("$file");
-	#$data = $data->{tags};
 	%data = audio_scan("$file");
 	for my $i (keys %data){
 		$columns{$i} = '1';
 	}
 }
 # DEBUG
-for my $i (keys %columns){
-	print "$i\n";
+if (!$options{quiet}){
+	for my $i (keys %columns){
+		print "Found tag \"$i\"\n";
+	}
 }
 
 # Connect to sqlite database created in the base of $music_dir
 my $dbh = DBI->connect("DBI:SQLite:dbname=$dbname", "", "", { RaiseError => 1}) or die $DBI::errstr;
-print "Opened database successfully\n";
+# DEBUG
+if (!$options{quiet}){
+	print "Opened database successfully\n";
+}
 
 # Overwrite $table_name if it exists (TODO alert user to overwrite)
-# TODO fix rows with non-ascii characters. These rows do not have any metadata filled in
 # If --append flag was passed, skip this step
 if (!$options{append}){
 	$statement = "DROP TABLE if EXISTS $table_name";
@@ -274,7 +270,6 @@ $statement =~ s/[,]$/;/g;
 db_cmd($dbh, $statement);
 
 # Set each file's tags in the table
-# TODO handle array tags (such as genre)
 for my $file (@file_list){
 	$statement = "UPDATE $table_name
 	SET ";
