@@ -15,11 +15,8 @@ our %columns;
 our $music_dir = File::HomeDir->my_home . "/Music/";
 our $dbname;
 our $table_name = "LIBRARY";
-our %extensions = (
-	flac => '1',
-	mp3 => '1',
-	ogg => '1'
-);
+our $extensions_list = "flac,mp3,ogg";
+our %extensions;
 
 # Keep track of options that have been set
 our %options = (
@@ -37,6 +34,13 @@ sub audio_scan {
 	my $data = Audio::Scan->scan("$_[0]");
 	$data = $data->{tags};
 	return %$data;
+}
+
+sub build_extension_hash {
+	my @extensions_arr = split /[,]/,$extensions_list;
+	for my $i (@extensions_arr){
+		$extensions{$i} = 1;
+	}
 }
 
 # Wrapper to handle sqlite commands
@@ -102,6 +106,7 @@ Generate a database for audio files in DIRECTORY (by default ~/Music).
 
 Options:
   -a, --append			append to database file, instead of overwriting it
+  -e, --extension EXTENSIONS	Set file extensions to look for, separated by commas (default is flac,mp3,ogg)
   -h, --help			display this help and exit
   -o, --output FILE		specify output file for database (default is library.db at the root of DIRECTORY)
   -t, --table-name TABLE	specify table name in database file (default is LIBRARY)
@@ -122,6 +127,11 @@ sub scan_test {
 for (my $i = 0; $i <= $#ARGV; $i++){
 	if ($ARGV[$i] =~ /-a|--append/){
 		$options{append} = 1;
+	}
+
+	elsif ($ARGV[$i] =~ /-e|--extension/){
+		$i++;
+		$extensions_list = $ARGV[$i];
 	}
 
 	elsif ($ARGV[$i] =~ /-h|--help/){
@@ -151,11 +161,17 @@ $music_dir =~ s/\/+$//g;
 if (!$options{output}){
 	$dbname = $music_dir . "/library.db";
 }
+for my $i (keys %extensions){
+	print "$i\n";
+}
 
 # Test to ensure $music_dir is a valid directory
 if (! -d $music_dir){
 	die "Error: \"$music_dir\" is not a directory\n";
 }
+
+# Build the extensions hash for use in get_files
+build_extension_hash();
 
 # Get a list of files in $music_dir
 print "Looking through files in $music_dir\n";
@@ -163,6 +179,11 @@ my @file_list = get_files($music_dir, %extensions);
 # DEBUG
 for my $i (sort @file_list){
 	print "$i\n";
+}
+
+# Quit if @file_list is empty
+if ($#file_list < 1){
+	die "Error: Could not find any files in \"$music_dir\" matching extension(s) \"$extensions_list\"\n";
 }
 
 # Get tags for each file
