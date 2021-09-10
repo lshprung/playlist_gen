@@ -249,6 +249,8 @@ for my $file (@file_list){
 	$statement =~ s/[,]$/\n/g;
 
 	# Specify this insertion is for $file only
+	# Encode to fix issues with non-ascii characters
+	utf8::encode($statement);
 	$statement = $statement . "WHERE PATH = \"$file\";";
 
 	#FIXME MCDI tag is binary. This should be considered and handled in a secondary file
