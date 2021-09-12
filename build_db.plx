@@ -7,6 +7,8 @@ use DBI;
 use Audio::Scan;
 use File::HomeDir;
 
+require "./shared.pl";
+
 
 # Keep track of columns that need to be created in the database
 our %columns;
@@ -62,24 +64,6 @@ sub build_extension_hash {
 	for my $i (@extensions_arr){
 		$extensions{$i} = 1;
 	}
-}
-
-# Wrapper to handle sqlite commands
-# 	@_[0]            -> database handle
-# 	@_[1]            -> command/statement
-# 	@_[2] (optional) -> output statement
-sub db_cmd {
-	my $rv = $_[0]->do($_[1]);
-	if ($rv < 0){
-		die $DBI::errstr;
-	}
-
-	# DEBUG
-	if (!$options{quiet} and defined $_[2]){
-		print "$_[2]\n";
-	}
-
-	return $rv;
 }
 
 
@@ -252,8 +236,8 @@ if (!$options{append}){
 # If appending, add columns where necessary
 else {
 	for my $i (sort(keys %columns)){
-		$statement = "SELECT COUNT(*) AS CNTREC FROM pragma_table_info('$table_name') WHERE name=\"$i\";";
-		if (db_cmd($dbh, $statement) > 0){
+		$statement = "SELECT COUNT(*) AS CNTREC FROM pragma_table_info('$table_name') WHERE name='$i';";
+		if (db_cmd($dbh, $statement) == 0){
 			$statement = "ALTER TABLE $table_name ADD COLUMN \"$i\";";
 			db_cmd($dbh, $statement);
 		}

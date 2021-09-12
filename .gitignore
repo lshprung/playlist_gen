@@ -2,3 +2,4 @@
 !.gitignore
 
 !build_db.plx
+!shared.pl
