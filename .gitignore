@@ -2,4 +2,5 @@
 !.gitignore
 
 !build_db.plx
+!build_playlists.plx
 !shared.pl

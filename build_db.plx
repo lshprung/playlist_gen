@@ -237,7 +237,7 @@ if (!$options{append}){
 else {
 	for my $i (sort(keys %columns)){
 		$statement = "SELECT COUNT(*) AS CNTREC FROM pragma_table_info('$table_name') WHERE name='$i';";
-		if (db_cmd($dbh, $statement) == 0){
+		if (!db_cmd($dbh, $statement)){
 			$statement = "ALTER TABLE $table_name ADD COLUMN \"$i\";";
 			db_cmd($dbh, $statement);
 		}
