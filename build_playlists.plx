@@ -85,6 +85,7 @@ for (my $i = 0; $i <= $#ARGV; $i++){
 	}
 }
 
+# Connect to database file
 my $dbh = DBI->connect("DBI:SQLite:dbname=$dbname", "", "", { RaiseError => 1}) or die $DBI::errstr;
 # DEBUG
 print "Opened database successfully\n";
@@ -93,4 +94,12 @@ print "Opened database successfully\n";
 $statement = "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='$table_name';";
 if (!db_cmd($dbh, $statement)){
 	die "Error: table \"$table_name\" does not exist in $dbname";
+}
+
+# If sql mode is turned on, build a playlist based on a query
+if ($options{sql}){
+	my @db_output = array_handler(db_cmd($dbh, $statement_arg, "SQL_STATEMENT returned successfully"));
+	for my $i (@db_output){
+		print "$i\n";
+	}
 }

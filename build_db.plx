@@ -28,28 +28,9 @@ our %options = (
 );
 
 my %data;      #Hold info from Audio::Scan
+my @db_output; #Hold array containing output from a sql statement
 my $statement; #Hold statements for sqlite
 
-
-# Handle digging into non-scalar tags
-# 	@_[0] -> array tag
-sub array_handler {
-	my $output = "";
-
-	for my $i (@_){
-		# If another array, recursively handle
-		if (ref($i) eq 'ARRAY'){
-			$output = $output . array_handler(@$i);
-		}
-
-		# If scalar, append to output normally
-		elsif (!ref($i)){
-			$output = $output . "$i;";
-		}
-	}
-
-	return $output;
-}
 
 # Wrapper to handle calls to Audio::Scan->scan(); returns tags hash
 # 	@_[0] -> file to scan
@@ -234,10 +215,12 @@ if (!$options{append}){
 }
 
 # If appending, add columns where necessary
+# FIXME add check to avoid duplicate rows with the same PATH
 else {
 	for my $i (sort(keys %columns)){
 		$statement = "SELECT COUNT(*) AS CNTREC FROM pragma_table_info('$table_name') WHERE name='$i';";
-		if (!db_cmd($dbh, $statement)){
+		@db_output = array_handler(db_cmd($dbh, $statement));
+		if (!$db_output[0]){
 			$statement = "ALTER TABLE $table_name ADD COLUMN \"$i\";";
 			db_cmd($dbh, $statement);
 		}
@@ -268,7 +251,9 @@ for my $file (@file_list){
 
 		# If tag is an array, encode the array into semicolon-separated string
 		if (ref($data{$i}) eq 'ARRAY'){
-			$statement = $statement . array_handler($data{$i});
+			for my $j (array_handler($data{$i})){
+				$statement = $statement . "$j;";
+			}
 			$statement =~ s/[;]+$//g;
 			$statement = $statement . "\",";
 		}

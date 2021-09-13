@@ -1,4 +1,25 @@
-# File to hold shared variables and subroutines
+# File to hold shared subroutines
+
+
+# Handle digging into non-scalar tags and other deep arrays
+# 	@_[0] -> array tag/deep array
+sub array_handler {
+	my @output;
+
+	for my $i (@_){
+		# If another array, recursively handle
+		if (ref($i) eq 'ARRAY'){
+			push(@output, array_handler(@$i));
+		}
+
+		# If scalar, append to output normally
+		elsif (!ref($i)){
+			push(@output, "$i");
+		}
+	}
+
+	return @output;
+}
 
 
 # Wrapper to handle sqlite commands, return an array of returned lines from sqlite output
@@ -18,7 +39,7 @@ sub db_cmd {
 	}
 
 	# Build output array
-	return($sth->fetchrow_array);
+	return($sth->fetchall_arrayref);
 }
 
 1;
