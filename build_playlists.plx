@@ -19,20 +19,24 @@ our %options = (
 	sql => 0
 );
 
+my @db_output; #Hold array containing output from a sql statement
 my $statement; #Hold statements for sqlite
 
 
 # Write to an m3u file to create a playlist
-# 	@_[0] -> m3u file path
+# 	@_[0] -> m3u file handle
 # 	@_[1] -> array of audio file paths
-sub append_to_m3u {
-	open FH, ">> $_[0]" or die $!;
+sub build_m3u {
+	my $filehandle = shift;
 
-	for my $line ($_[1]){
-		print FH $line;
+	# Create m3u header
+	# TODO check if file is empty before adding the header
+	print $filehandle "#EXTM3U\n\n";
+
+	# TODO add support for EXTINF metadata (track runtime, Display name)
+	for my $line (@_){
+		print $filehandle "$line\n";
 	}
-
-	close FH;
 }
 
 # Print a help message
@@ -98,8 +102,10 @@ if (!db_cmd($dbh, $statement)){
 
 # If sql mode is turned on, build a playlist based on a query
 if ($options{sql}){
-	my @db_output = array_handler(db_cmd($dbh, $statement_arg, "SQL_STATEMENT returned successfully"));
-	for my $i (@db_output){
-		print "$i\n";
-	}
+	@db_output = flatten_array(db_cmd($dbh, $statement_arg, "SQL_STATEMENT returned successfully"));
+
+	# TODO add switch for appending
+	# TODO alert user to overwrite
+	open FH, "> $output_pattern" or die $!;
+	build_m3u(*FH, @db_output);
 }

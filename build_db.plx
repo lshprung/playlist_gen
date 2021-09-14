@@ -219,7 +219,7 @@ if (!$options{append}){
 else {
 	for my $i (sort(keys %columns)){
 		$statement = "SELECT COUNT(*) AS CNTREC FROM pragma_table_info('$table_name') WHERE name='$i';";
-		@db_output = array_handler(db_cmd($dbh, $statement));
+		@db_output = flatten_array(db_cmd($dbh, $statement));
 		if (!$db_output[0]){
 			$statement = "ALTER TABLE $table_name ADD COLUMN \"$i\";";
 			db_cmd($dbh, $statement);
@@ -251,7 +251,7 @@ for my $file (@file_list){
 
 		# If tag is an array, encode the array into semicolon-separated string
 		if (ref($data{$i}) eq 'ARRAY'){
-			for my $j (array_handler($data{$i})){
+			for my $j (flatten_array($data{$i})){
 				$statement = $statement . "$j;";
 			}
 			$statement =~ s/[;]+$//g;
