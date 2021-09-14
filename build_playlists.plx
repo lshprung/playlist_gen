@@ -139,16 +139,17 @@ else {
 		@db_output = flatten_array(db_cmd($dbh, "SELECT $statement FROM $table_name WHERE ID=$i;"));
 		for my $j (0..scalar(@db_output)-1){
 			$tag_hash{$tags_of_interest[$j]} = $db_output[$j];
+
+			# remove illegal filename characters, replace them with underscore
+			if (!($tags_of_interest[$j] eq "PATH")){
+				$tag_hash{$tags_of_interest[$j]} =~ s/[\/<>:"\\|?*]/_/g;
+			}
 		}
 
 		# TODO break up by semicolon (signifying array of tag values)
 		# Determine output_file
 		$output_file = $output_pattern;
 		$output_file =~ s/[{]([^}]*)[}]/$tag_hash{$1}/g;
-
-		# remove illegal filename characters, replace them with underscore
-		$output_file =~ s/[\/<>:"\\|?*]/_/g;
-		print "$output_file\n";
 
 		# Open the file for writing
 		open FH, ">> $output_file" or die $!;
