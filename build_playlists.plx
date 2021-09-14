@@ -141,11 +141,15 @@ else {
 			$tag_hash{$tags_of_interest[$j]} = $db_output[$j];
 		}
 
+		# TODO break up by semicolon (signifying array of tag values)
 		# Determine output_file
 		$output_file = $output_pattern;
 		$output_file =~ s/[{]([^}]*)[}]/$tag_hash{$1}/g;
 
-		# TODO remove illegal filename characters
+		# remove illegal filename characters, replace them with underscore
+		$output_file =~ s/[\/<>:"\\|?*]/_/g;
+		print "$output_file\n";
+
 		# Open the file for writing
 		open FH, ">> $output_file" or die $!;
 		# DEBUG
