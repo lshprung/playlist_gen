@@ -10,9 +10,9 @@ require "./shared.pl";
 # Variables to be set by the user
 our $dbname = File::HomeDir->my_home . "/Music/library.db";
 our $table_name = "LIBRARY";
-our @tags_of_interest; # Record TAG arguments
-our $output_pattern;   # Record OUTPUT_PATTERN argument
-our $statement_arg;    # Record SQL_STATEMENT argument
+our @tags_of_interest = ("PATH"); # Record TAG arguments (PATH will always be of interest)
+our $output_pattern;              # Record OUTPUT_PATTERN argument
+our $statement_arg;               # Record SQL_STATEMENT argument
 
 # Keep track of options that have been set
 our %options = (
@@ -31,7 +31,9 @@ sub build_m3u {
 
 	# Create m3u header
 	# TODO check if file is empty before adding the header
-	print $filehandle "#EXTM3U\n\n";
+	if (eof $filehandle){
+		print $filehandle "#EXTM3U\n\n";
+	}
 
 	# TODO add support for EXTINF metadata (track runtime, Display name)
 	for my $line (@_){
@@ -60,7 +62,7 @@ Options:
       --sql SQL_STATEMENT	generate a single playlist based on output of some SQL statement
 
 Examples:
-  $0 ALBUM,ALBUMARTIST ~/Music/playlists/{ALBUMARTIST}-{ALBUM}.m3u			Generate a playlist for every combination of ALBUM and ALBUMARTIST in the database, with the output file pattern ALBUMARTIST-ALBUM.m3u
+  $0 ALBUM,ALBUMARTIST /home/john/Music/playlists/{ALBUMARTIST}-{ALBUM}.m3u			Generate a playlist for every combination of ALBUM and ALBUMARTIST in the database, with the output file pattern ALBUMARTIST-ALBUM.m3u
   $0 --sql \"SELECT PATH FROM LIBRARY WHERE ARTIST='Steely Dan';\" steely_dan.m3u	Generate a playlist based on the output of this SQL statement
   $0 --sql \"ARTIST='Steely Dan';\" steely_dan.m3u					If an incomplete SQL statement is received, the \"SELECT PATH FROM {table_name} WHERE \" part of the SQL statement is assumed to be implied
 ";
@@ -82,8 +84,8 @@ for (my $i = 0; $i <= $#ARGV; $i++){
 
 	elsif ($ARGV[$i] =~ /^[^-]/){
 		# This arg should contain the list of tags
-		if (!$options{sql} and !scalar(@tags_of_interest)){
-			@tags_of_interest = split(',', "$ARGV[$i]");
+		if (!$options{sql} and scalar(@tags_of_interest) <= 1){
+			push(@tags_of_interest, split(',', "$ARGV[$i]"));
 		}
 		# This arg should contain the output_pattern
 		else {
@@ -119,4 +121,39 @@ if ($options{sql}){
 	# DEBUG
 	print "Opened $output_pattern\n";
 	build_m3u(*FH, @db_output);
+	close FH;
 }
+
+# Go through every entry to build multiple playlists
+else {
+	my %tag_hash;    # Track tag values for each file
+	my $output_file; # Output file, based on output_pattern
+
+	@db_output = flatten_array(db_cmd($dbh, "SELECT count(*) FROM $table_name;"));
+	my $row_count = $db_output[0];
+
+	# Go through each row by ID
+	for my $i (1..$row_count){
+		# Get output for the PATH, plus each tag of interest; store it in tag_hash
+		$statement = join(',', @tags_of_interest);
+		@db_output = flatten_array(db_cmd($dbh, "SELECT $statement FROM $table_name WHERE ID=$i;"));
+		for my $j (0..scalar(@db_output)-1){
+			$tag_hash{$tags_of_interest[$j]} = $db_output[$j];
+		}
+
+		# Determine output_file
+		$output_file = $output_pattern;
+		$output_file =~ s/[{]([^}]*)[}]/$tag_hash{$1}/g;
+
+		# TODO remove illegal filename characters
+		# Open the file for writing
+		open FH, ">> $output_file" or die $!;
+		# DEBUG
+		print "Opened $output_file\n";
+		build_m3u(*FH, $tag_hash{PATH});
+		close FH;
+	}
+}
+
+# Disconnect from sqlite database
+$dbh->disconnect();
