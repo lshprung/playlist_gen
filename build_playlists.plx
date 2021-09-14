@@ -36,10 +36,14 @@ sub build_m3u {
 	# TODO add support for EXTINF metadata (track runtime, Display name)
 	for my $line (@_){
 		print $filehandle "$line\n";
+		# DEBUG
+		print "Added $line\n";
 	}
 }
 
 # Print a help message
+# TODO support custom table name
+# TODO support custom database path
 sub print_help {
 	print
 "Usage:
@@ -58,7 +62,7 @@ Options:
 Examples:
   $0 ALBUM,ALBUMARTIST ~/Music/playlists/{ALBUMARTIST}-{ALBUM}.m3u			Generate a playlist for every combination of ALBUM and ALBUMARTIST in the database, with the output file pattern ALBUMARTIST-ALBUM.m3u
   $0 --sql \"SELECT PATH FROM LIBRARY WHERE ARTIST='Steely Dan';\" steely_dan.m3u	Generate a playlist based on the output of this SQL statement
-  $0 --sql \"ARTIST='Steely Dan';\" steely_dan.m3u					If an incomplete SQL statement is received, the \"SELECT PATH FROM LIBRARY WHERE \" part of the SQL statement is assumed to be implied
+  $0 --sql \"ARTIST='Steely Dan';\" steely_dan.m3u					If an incomplete SQL statement is received, the \"SELECT PATH FROM {table_name} WHERE \" part of the SQL statement is assumed to be implied
 ";
 }
 
@@ -102,10 +106,17 @@ if (!db_cmd($dbh, $statement)){
 
 # If sql mode is turned on, build a playlist based on a query
 if ($options{sql}){
+	# If query does not start with 'SELECT', assume it is implied
+	if (!($statement_arg =~ /^SELECT/i)){
+		$statement_arg = "SELECT PATH FROM $table_name WHERE " . $statement_arg;
+	}
+
 	@db_output = flatten_array(db_cmd($dbh, $statement_arg, "SQL_STATEMENT returned successfully"));
 
 	# TODO add switch for appending
 	# TODO alert user to overwrite
 	open FH, "> $output_pattern" or die $!;
+	# DEBUG
+	print "Opened $output_pattern\n";
 	build_m3u(*FH, @db_output);
 }
