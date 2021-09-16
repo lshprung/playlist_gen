@@ -205,7 +205,7 @@ if (!$options{append}){
 	# Need to create additional columns for ID and PATH
 	$statement = "CREATE TABLE $table_name 
 	(ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-	PATH TEXT NOT NULL";
+	PATH TEXT NOT NULL UNIQUE";
 	for my $i (sort(keys %columns)){
 		$statement = $statement . ",
 		\"$i\" TEXT";
@@ -215,7 +215,6 @@ if (!$options{append}){
 }
 
 # If appending, add columns where necessary
-# FIXME add check to avoid duplicate rows with the same PATH
 else {
 	for my $i (sort(keys %columns)){
 		$statement = "SELECT COUNT(*) AS CNTREC FROM pragma_table_info('$table_name') WHERE name='$i';";
@@ -231,7 +230,12 @@ else {
 $statement = "INSERT INTO $table_name(PATH)
 VALUES";
 for my $file (@file_list){
-	$statement = $statement . "(\"$file\"),";
+	# Skip existing files
+	@db_output = flatten_array(db_cmd($dbh, "SELECT count(*) FROM $table_name WHERE PATH='$file';"));
+
+	if(!$db_output[0]){
+		$statement = $statement . "(\"$file\"),";
+	}
 }
 $statement =~ s/[,]$/;/g;
 db_cmd($dbh, $statement);
