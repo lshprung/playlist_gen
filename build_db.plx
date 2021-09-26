@@ -23,6 +23,7 @@ our %extensions;
 # Keep track of options that have been set
 our %options = (
 	append => 0,
+	debug  => 0,
 	output => 0,
 	quiet  => 0
 );
@@ -98,6 +99,7 @@ Generate a database for audio files in DIRECTORY (by default ~/Music).
 
 Options:
   -a, --append			append to database file, instead of overwriting it
+  -d, --debug           print additional output for debugging purposes
   -e, --extension EXTENSIONS	Set file extensions to look for, separated by commas (default is flac,mp3,ogg)
   -h, --help			display this help and exit
   -o, --output FILE		specify output file for database (default is library.db at the root of DIRECTORY)
@@ -111,6 +113,10 @@ Options:
 for (my $i = 0; $i <= $#ARGV; $i++){
 	if ($ARGV[$i] =~ /-a|--append/){
 		$options{append} = 1;
+	}
+
+	if ($ARGV[$i] =~ /-d|--debug/){
+		$options{debug} = 1;
 	}
 
 	elsif ($ARGV[$i] =~ /-e|--extension/){
@@ -231,7 +237,7 @@ $statement = "INSERT INTO $table_name(PATH)
 VALUES";
 for my $file (@file_list){
 	# Skip existing files
-	@db_output = flatten_array(db_cmd($dbh, "SELECT count(*) FROM $table_name WHERE PATH='$file';"));
+	@db_output = flatten_array(db_cmd($dbh, "SELECT count(*) FROM $table_name WHERE PATH=\"$file\";")); #FIXME this can break if there is a '"' character in a filename
 
 	if(!$db_output[0]){
 		$statement = $statement . "(\"$file\"),";

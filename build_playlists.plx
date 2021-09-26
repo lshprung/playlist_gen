@@ -30,7 +30,6 @@ sub build_m3u {
 	my $filehandle = shift;
 
 	# Create m3u header
-	# TODO check if file is empty before adding the header
 	if (eof $filehandle){
 		print $filehandle "#EXTM3U\n\n";
 	}

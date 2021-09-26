@@ -6,6 +6,10 @@
 # 	@_[1]            -> command/statement
 # 	@_[2] (optional) -> output statement
 sub db_cmd {
+	if ($options{debug}){
+		print "Preparing SQL query \"$_[1]\"\n"
+	}
+
 	my $sth = $_[0]->prepare($_[1]);
 
 	if ($sth->execute < 0){
