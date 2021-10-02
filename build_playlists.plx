@@ -23,14 +23,18 @@ my @db_output; #Hold array containing output from a sql statement
 my $statement; #Hold statements for sqlite
 
 
+# TODO add support for overwriting playlists
+# TODO make it so files are sorted ahead of time (may require functions from sqlite API)
 # Write to an m3u file to create a playlist
-# 	@_[0] -> m3u file handle
-# 	@_[1] -> array of audio file paths
+# 	@_[0] -> m3u file path
+# 	@_[1] -> m3u file handle
+# 	@_[2] -> array of audio file paths
 sub build_m3u {
+	my $filename = shift;
 	my $filehandle = shift;
 
-	# Create m3u header
-	if (eof $filehandle){
+	# Create m3u header if the file is new
+	if ((-s $filename) == 0){
 		print $filehandle "#EXTM3U\n\n";
 	}
 
@@ -119,7 +123,7 @@ if ($options{sql}){
 	open FH, "> $output_pattern" or die $!;
 	# DEBUG
 	print "Opened $output_pattern\n";
-	build_m3u(*FH, @db_output);
+	build_m3u("$output_pattern", *FH, @db_output);
 	close FH;
 }
 
@@ -162,7 +166,7 @@ else {
 		open FH, ">> $output_file" or die $!;
 		# DEBUG
 		print "Opened $output_file\n";
-		build_m3u(*FH, $tag_hash{PATH});
+		build_m3u("$output_file", *FH, $tag_hash{PATH});
 		close FH;
 	}
 }
