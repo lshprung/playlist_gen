@@ -61,7 +61,7 @@ Options:
       --sql SQL_STATEMENT	generate a single playlist based on output of some SQL statement
 
 Examples:
-  $0 ALBUM,ALBUMARTIST /home/john/Music/playlists/{ALBUMARTIST}-{ALBUM}.m3u			Generate a playlist for every combination of ALBUM and ALBUMARTIST in the database, with the output file pattern ALBUMARTIST-ALBUM.m3u
+  $0 ALBUM,ALBUMARTIST \"/home/john/Music/playlists/{ALBUMARTIST}-{ALBUM}.m3u\"			Generate a playlist for every combination of ALBUM and ALBUMARTIST in the database, with the output file pattern ALBUMARTIST-ALBUM.m3u
   $0 --sql \"SELECT PATH FROM LIBRARY WHERE ARTIST='Steely Dan';\" steely_dan.m3u	Generate a playlist based on the output of this SQL statement
   $0 --sql \"ARTIST='Steely Dan';\" steely_dan.m3u					If an incomplete SQL statement is received, the \"SELECT PATH FROM {table_name} WHERE \" part of the SQL statement is assumed to be implied
 ";
@@ -144,6 +144,14 @@ else {
 				$tag_hash{$tags_of_interest[$j]} =~ s/[\/<>:"\\|?*]/_/g;
 			}
 		}
+
+		## DEBUG TODO remove me
+		#for my $i (keys %tag_hash){
+		#	for my $j ($tag_hash{$i}){
+		#		print "$j\n";
+		#	}
+		#}
+		#die;
 
 		# TODO break up by semicolon (signifying array of tag values)
 		# Determine output_file
