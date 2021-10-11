@@ -20,6 +20,7 @@ our $table_name = "LIBRARY";
 our $extensions_list = "flac,mp3,ogg";
 our %extensions;
 
+# TODO add depth flag
 # Keep track of options that have been set
 our %options = (
 	append => 0,
@@ -61,7 +62,7 @@ sub get_files {
 	my $extensions = $_[1];
 
 	opendir my $dh, "$dir_path" or die "$!";
-	while (my $file = readdir($dh)) {
+	foreach my $file(sort readdir($dh)) {
 		# Skip . and .. directories
 		if ($file eq "." or $file eq ".."){
 			next;
