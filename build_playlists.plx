@@ -16,6 +16,7 @@ our $statement_arg;               # Record SQL_STATEMENT argument
 
 # Keep track of options that have been set
 our %options = (
+	quiet => 0,
 	sql => 0
 );
 
@@ -42,7 +43,9 @@ sub build_m3u {
 	for my $line (@_){
 		print $filehandle "$line\n";
 		# DEBUG
-		print "Added $line\n";
+		if (!$options{quiet}){
+			print "Added $line\n";
+		}
 	}
 }
 
@@ -61,11 +64,14 @@ Multiple tags can be specified. They must be comma-separated.
 If tags are specified, an output pattern can also be specified (see Examples).
 
 Options:
+  -i, --input FILE		specify path for database file to use to generate playlists (default is \$HOME/Music/library.db)
   -h, --help			display this help and exit
+  -q, --quiet			quiet (no output)
       --sql SQL_STATEMENT	generate a single playlist based on output of some SQL statement
+  -t, --table-name TABLE	specify table name in database file (default is LIBRARY)
 
 Examples:
-  $0 ALBUM,ALBUMARTIST \"/home/john/Music/playlists/{ALBUMARTIST}-{ALBUM}.m3u\"			Generate a playlist for every combination of ALBUM and ALBUMARTIST in the database, with the output file pattern ALBUMARTIST-ALBUM.m3u
+  $0 ALBUM,ALBUMARTIST \"/home/john/Music/playlists/{ALBUMARTIST}-{ALBUM}.m3u\"	Generate a playlist for every combination of ALBUM and ALBUMARTIST in the database, with the output file pattern ALBUMARTIST-ALBUM.m3u
   $0 --sql \"SELECT PATH FROM LIBRARY WHERE ARTIST='Steely Dan';\" steely_dan.m3u	Generate a playlist based on the output of this SQL statement
   $0 --sql \"ARTIST='Steely Dan';\" steely_dan.m3u					If an incomplete SQL statement is received, the \"SELECT PATH FROM {table_name} WHERE \" part of the SQL statement is assumed to be implied
 ";
@@ -74,15 +80,29 @@ Examples:
 
 # parse flags and arguments
 for (my $i = 0; $i <= $#ARGV; $i++){
-	if ($ARGV[$i] =~ /-h|--help/){
+	if ($ARGV[$i] =~ /-i|--input/){
+		$i++;
+		$dbname = "$ARGV[$i]";
+	}
+
+	elsif ($ARGV[$i] =~ /-h|--help/){
 		print_help();
 		exit;
+	}
+
+	elsif ($ARGV[$i] =~ /-q|--quiet/){
+		$options{quiet} = 1;
 	}
 
 	elsif ($ARGV[$i] =~ /--sql/){
 		$i++;
 		$statement_arg = "$ARGV[$i]";
 		$options{sql} = 1;
+	}
+
+	elsif ($ARGV[$i] =~ /-t|--table-name/){
+		$i++;
+		$table_name = "$ARGV[$i]";
 	}
 
 	elsif ($ARGV[$i] =~ /^[^-]/){
@@ -98,10 +118,16 @@ for (my $i = 0; $i <= $#ARGV; $i++){
 	}
 }
 
+# Quit if dbname does not exist
+if (! -r $dbname){
+	die "Error: database $dbname is not readable or does not exist"
+}
 # Connect to database file
 my $dbh = DBI->connect("DBI:SQLite:dbname=$dbname", "", "", { RaiseError => 1}) or die $DBI::errstr;
 # DEBUG
-print "Opened database successfully\n";
+if (!$options{quiet}){
+	print "Opened database successfully\n";
+}
 
 # Check that table exists
 $statement = "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='$table_name';";
@@ -122,7 +148,9 @@ if ($options{sql}){
 	# TODO alert user to overwrite
 	open FH, "> $output_pattern" or die $!;
 	# DEBUG
-	print "Opened $output_pattern\n";
+	if (!$options{quiet}){
+		print "Opened $output_pattern\n";
+	}
 	build_m3u("$output_pattern", *FH, @db_output);
 	close FH;
 }
