@@ -50,6 +50,57 @@ sub build_m3u {
 	}
 }
 
+# Subroutine to determine the output files for a given file
+#   @_[0] -> reference to tag hashes
+sub get_output_files {
+	my @output;
+	my %tag_hash = @_;
+	my %count_hash; #keep track of index from tag_hash
+	my %value_hash; #keep track of value from tag_hash
+	my @keys_arr;   #array of keys from tag_hash
+
+	# Remove PATH from tag_hash
+	delete($tag_hash{"PATH"});
+	
+	# Initialize count_hash and value_hash
+	for my $i (sort(keys %tag_hash)){
+		push(@keys_arr, $i);
+		#print("@keys_arr\n");
+		$count_hash{$i} = 0;
+		#print("$i -> $count_hash{$i}\n");
+		$value_hash{$i} = @{$tag_hash{$i}}[0];
+		#print("$i -> $value_hash{$i}\n");
+	}
+
+	# Loop through all possible combinations of tags and append to @output
+	OUTER: while(1){
+		push(@output, $output_pattern);
+		$output[-1] =~ s/[{]([^}]*)[}]/$value_hash{$1}/g;
+
+		# Update
+		INNER: for my $key_index (@keys_arr){
+			$count_hash{$key_index} = (($count_hash{$key_index}+1) % scalar(@{$tag_hash{$key_index}}));
+			$value_hash{$key_index} = @{$tag_hash{$key_index}}[$count_hash{$key_index}];
+			if($count_hash{$key_index} > 0){
+				next OUTER;
+			}
+		}
+		last OUTER;
+	}
+
+	return @output;
+}
+
+
+	#for my $i (keys %tag_hash){
+	#	if (!($i eq "PATH")){
+	#		print("$i -> @{$tag_hash{$i}}\n");
+	#	}
+	#	else{
+	#		print("$i -> $tag_hash{$i}\n");
+	#	}
+	#}
+
 # Print a help message
 sub print_help {
 	print
@@ -165,6 +216,9 @@ else {
 
 	# Go through each row by ID
 	for my $i (1..$row_count){
+		# Reset @output_files
+		@output_files = ();
+
 		# Get output for the PATH, plus each tag of interest; store it in tag_hash
 		$statement = join(',', @tags_of_interest);
 		@db_output = flatten_array(db_cmd($dbh, "SELECT $statement FROM $table_name WHERE ID=$i;"));
@@ -183,29 +237,20 @@ else {
 
 		}
 
-		# TODO determine array of output files (consider making this a separate subroutine)
-		#$output_file = $output_pattern;
-		#$output_file =~ s/[{]([^}]*)[}]/$tag_hash{$1}/g;
-		# TODO Remove duplicates from @output_file
-		# TODO break up by semicolon (signifying array of tag values)
+		# determine array of output files (consider making this a separate subroutine)
+		@output_files = get_output_files(%tag_hash);
 
-		#for my $j (keys %tag_hash){
-		#	for my $k (split(';', $tag_hash{$j})){
-		#		print("$j -> $k\n");
-		#	}
-		#}
-		next;
-
-		# Determine output_file
-
-		# Open the file for writing
-		#open FH, ">> $output_file" or die $!;
-		# DEBUG
-		if (!$options{quiet}){
-			#print "Opened $output_file\n";
+		# Loop to add to proper files:
+		for my $output_file (@output_files){
+			# Open the file for writing
+			open FH, ">> $output_file" or die $!;
+			# DEBUG
+			if (!$options{quiet}){
+				print "Opened $output_file\n";
+			}
+			build_m3u("$output_file", *FH, $tag_hash{PATH});
+			close FH;
 		}
-		#build_m3u("$output_file", *FH, $tag_hash{PATH});
-		close FH;
 
 	}
 }
