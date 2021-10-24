@@ -13,6 +13,7 @@ our $table_name = "LIBRARY";
 our @tags_of_interest = ("PATH"); # Record TAG arguments (PATH will always be of interest)
 our $output_pattern;              # Record OUTPUT_PATTERN argument
 our $statement_arg;               # Record SQL_STATEMENT argument
+our $separator = ';';             # Symbol set to separate multiple values per file tag (TODO add flags related to this)
 
 # Keep track of options that have been set
 our %options = (
@@ -24,8 +25,8 @@ my @db_output; #Hold array containing output from a sql statement
 my $statement; #Hold statements for sqlite
 
 
+# TODO quit with help message if no arguments set
 # TODO add support for overwriting playlists
-# TODO make it so files are sorted ahead of time (may require functions from sqlite API)
 # Write to an m3u file to create a playlist
 # 	@_[0] -> m3u file path
 # 	@_[1] -> m3u file handle
@@ -50,8 +51,6 @@ sub build_m3u {
 }
 
 # Print a help message
-# TODO support custom table name
-# TODO support custom database path
 sub print_help {
 	print
 "Usage:
@@ -158,7 +157,8 @@ if ($options{sql}){
 # Go through every entry to build multiple playlists
 else {
 	my %tag_hash;    # Track tag values for each file
-	my $output_file; # Output file, based on output_pattern
+	my @output_files; # Output files, based on output_pattern
+	my @value_arr;   # Hold values after splitting by SEP to append to tag_hash
 
 	@db_output = flatten_array(db_cmd($dbh, "SELECT count(*) FROM $table_name;"));
 	my $row_count = $db_output[0];
@@ -171,31 +171,42 @@ else {
 		for my $j (0..scalar(@db_output)-1){
 			$tag_hash{$tags_of_interest[$j]} = $db_output[$j];
 
-			# remove illegal filename characters, replace them with underscore
 			if (!($tags_of_interest[$j] eq "PATH")){
+				# remove illegal filename characters, replace them with underscore
 				$tag_hash{$tags_of_interest[$j]} =~ s/[\/<>:"\\|?*]/_/g;
+
+				# Separate out arrays
+				@value_arr = split(';', $tag_hash{$tags_of_interest[$j]}); 
+				@tag_hash{$tags_of_interest[$j]} = ();
+				push(@{$tag_hash{$tags_of_interest[$j]}}, @value_arr);
 			}
+
 		}
 
-		## DEBUG TODO remove me
-		#for my $i (keys %tag_hash){
-		#	for my $j ($tag_hash{$i}){
-		#		print "$j\n";
+		# TODO determine array of output files (consider making this a separate subroutine)
+		#$output_file = $output_pattern;
+		#$output_file =~ s/[{]([^}]*)[}]/$tag_hash{$1}/g;
+		# TODO Remove duplicates from @output_file
+		# TODO break up by semicolon (signifying array of tag values)
+
+		#for my $j (keys %tag_hash){
+		#	for my $k (split(';', $tag_hash{$j})){
+		#		print("$j -> $k\n");
 		#	}
 		#}
-		#die;
+		next;
 
-		# TODO break up by semicolon (signifying array of tag values)
 		# Determine output_file
-		$output_file = $output_pattern;
-		$output_file =~ s/[{]([^}]*)[}]/$tag_hash{$1}/g;
 
 		# Open the file for writing
-		open FH, ">> $output_file" or die $!;
+		#open FH, ">> $output_file" or die $!;
 		# DEBUG
-		print "Opened $output_file\n";
-		build_m3u("$output_file", *FH, $tag_hash{PATH});
+		if (!$options{quiet}){
+			#print "Opened $output_file\n";
+		}
+		#build_m3u("$output_file", *FH, $tag_hash{PATH});
 		close FH;
+
 	}
 }
 
