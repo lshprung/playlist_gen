@@ -20,13 +20,13 @@ our $table_name = "LIBRARY";
 our $extensions_list = "flac,mp3,ogg";
 our %extensions;
 
-# TODO add depth flag
 # Keep track of options that have been set
 our %options = (
-	append => 0,
-	debug  => 0,
-	output => 0,
-	quiet  => 0
+	append    => 0,
+	debug     => 0,
+	max_depth => 0,
+	output    => 0,
+	quiet     => 0
 );
 
 my %data;      #Hold info from Audio::Scan
@@ -52,14 +52,18 @@ sub build_extension_hash {
 
 # Scan a directory recursively, return an array of files (optionally, matching a certain file extension or extensions)
 # 	@_[0] -> $music_dir
-# 	@_[1] -> hash of file extensions to scan for
+# 	@_[1] -> current_depth (should start at 1)
+# 	@_[2] -> max_depth (0 for no limit)
+# 	@_[3] -> hash of file extensions to scan for
 sub get_files {
 	my @file_list;
 	my @file_split;
 
 	# Remove extra /'s from the end of $_[0]
 	my $dir_path = $_[0];
-	my $extensions = $_[1];
+	my $current_depth = $_[1];
+	my $max_depth = $_[2];
+	my $extensions = $_[3];
 
 	opendir my $dh, "$dir_path" or die "$!";
 	foreach my $file(sort readdir($dh)) {
@@ -69,7 +73,10 @@ sub get_files {
 		}
 
 		if (-d "$dir_path/$file"){
-			push(@file_list, get_files("$dir_path/$file", %extensions));
+			# Only recurse if $current_depth does not equal $max_depth yet
+			if ($current_depth != $max_depth){
+				push(@file_list, get_files("$dir_path/$file", $current_depth+1, $max_depth, %extensions));
+			}
 		}
 
 		elsif (-f "$dir_path/$file" and -r "$dir_path/$file"){
@@ -100,9 +107,10 @@ Generate a database for audio files in DIRECTORY (by default ~/Music).
 
 Options:
   -a, --append			append to database file, instead of overwriting it
-  -d, --debug           print additional output for debugging purposes
+      --debug           	print additional output for debugging purposes
   -e, --extension EXTENSIONS	Set file extensions to look for, separated by commas (default is flac,mp3,ogg)
   -h, --help			display this help and exit
+  -d, --max-depth DEPTH     	specify a max DEPTH to search for matching files inside DIRECTORY (DEPTH should be an integer >=1)
   -o, --output FILE		specify output file for database (default is library.db at the root of DIRECTORY)
   -q, --quiet			quiet (no output)
   -t, --table-name TABLE	specify table name in database file (default is LIBRARY)
@@ -116,7 +124,7 @@ for (my $i = 0; $i <= $#ARGV; $i++){
 		$options{append} = 1;
 	}
 
-	if ($ARGV[$i] =~ /-d|--debug/){
+	elsif ($ARGV[$i] =~ /--debug/){
 		$options{debug} = 1;
 	}
 
@@ -129,6 +137,12 @@ for (my $i = 0; $i <= $#ARGV; $i++){
 		print_help();
 		exit;
 	}
+
+	elsif ($ARGV[$i] =~ /-d|--max-depth/){
+		$i++;
+		$options{max_depth} = $ARGV[$i]
+	}
+
 
 	elsif ($ARGV[$i] =~ /-o|--output/){
 		$i++;
@@ -174,7 +188,7 @@ if (!$options{quiet}){
 }
 
 # Get a list of files in $music_dir
-my @file_list = get_files($music_dir, %extensions);
+my @file_list = get_files($music_dir, 1, $options{max_depth}, %extensions);
 
 # Quit if @file_list is empty
 if ($#file_list < 1){

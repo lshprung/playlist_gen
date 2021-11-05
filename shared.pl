@@ -25,8 +25,6 @@ sub db_cmd {
 	return($sth->fetchall_arrayref);
 }
 
-1;
-
 # Handle digging into non-scalar tags and other deep arrays
 # 	@_[0] -> array tag/deep array
 sub flatten_array {
@@ -47,3 +45,4 @@ sub flatten_array {
 	return @output;
 }
 
+1;
