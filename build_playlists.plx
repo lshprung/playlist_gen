@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use DBI;
 use File::HomeDir;
+use File::Spec;
 
 require "./shared.pl";
 
@@ -18,6 +19,7 @@ our $separator = ';';             # Symbol set to separate multiple values per f
 # Keep track of options that have been set
 our %options = (
 	quiet => 0,
+	relative => 0,
 	sql => 0
 );
 
@@ -42,6 +44,13 @@ sub build_m3u {
 
 	# TODO add support for EXTINF metadata (track runtime, Display name)
 	for my $line (@_){
+		# Set $line to a relative path compared to $filename if relative option is set
+		if($options{relative}){
+			$filename = File::Spec->rel2abs($filename);
+			$line = File::Spec->abs2rel($line, $filename);
+			$line =~ s/^\.\.\///;
+		}
+
 		print $filehandle "$line\n";
 		# DEBUG
 		if (!$options{quiet}){
@@ -117,6 +126,7 @@ Options:
   -i, --input FILE		specify path for database file to use to generate playlists (default is \$HOME/Music/library.db)
   -h, --help			display this help and exit
   -q, --quiet			quiet (no output)
+      --relative		use relative paths instead of absolute paths for entries
       --sql SQL_STATEMENT	generate a single playlist based on output of some SQL statement
   -t, --table-name TABLE	specify table name in database file (default is LIBRARY)
 
@@ -142,6 +152,10 @@ for (my $i = 0; $i <= $#ARGV; $i++){
 
 	elsif ($ARGV[$i] =~ /-q|--quiet/){
 		$options{quiet} = 1;
+	}
+
+	elsif ($ARGV[$i] =~ /--relative/){
+		$options{relative} = 1;
 	}
 
 	elsif ($ARGV[$i] =~ /--sql/){
