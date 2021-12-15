@@ -52,15 +52,30 @@ sub build_extension_hash {
 
 # Look for control characters in a string to attempt to detect binary data
 #   @_[0] -> string argument
-# Returns 1 if @_[0] is in control range (0-19); 0 otherwise
+# Returns 1 if @_[0] is in control range (see below); 0 otherwise
 sub detect_binary {
 	my $unicode_val;
 
-	utf8::encode($_[0]);
+	# If the argument is an array, break it up and run detect_binary on each arg
+	if (ref($_[0]) eq 'ARRAY'){
+		for my $i (flatten_array($_[0])){
+			if(detect_binary($i)){
+				return 1;
+			}
+		}
+		return 0;
+	}
+
 	for my $char (split("", $_[0])){
 		$unicode_val = sprintf("%X", ord($char));
 		$unicode_val = hex("0x$unicode_val");
-		if ($unicode_val < 20 and $unicode_val > 0){
+		if($options{debug}){
+			print "$_[0] \t $char: $unicode_val\n";
+		}
+		if (($unicode_val < 7 && $unicode_val > 0) || ($unicode_val < 32 and $unicode_val > 13)){
+			if($options{debug}){
+				print "Found binary on unicode $unicode_val\n";
+			}
 			return 1;
 		}
 	}
@@ -301,7 +316,7 @@ for my $file (@file_list){
 		#	}
 		#}
 		
-		next if detect_binary($data{$i});#TODO detect_binary creates false positives, for example, LYRICS tag
+		next if detect_binary($data{$i});
 		$data{$i} =~ s/\"/\'\'/g;
 		$statement = $statement . "\"$i\" = \"";
 
