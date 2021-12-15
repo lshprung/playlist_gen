@@ -50,6 +50,24 @@ sub build_extension_hash {
 }
 
 
+# Look for control characters in a string to attempt to detect binary data
+#   @_[0] -> string argument
+# Returns 1 if @_[0] is in control range (0-19); 0 otherwise
+sub detect_binary {
+	my $unicode_val;
+
+	utf8::encode($_[0]);
+	for my $char (split("", $_[0])){
+		$unicode_val = sprintf("%X", ord($char));
+		$unicode_val = hex("0x$unicode_val");
+		if ($unicode_val < 20 and $unicode_val > 0){
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 # Scan a directory recursively, return an array of files (optionally, matching a certain file extension or extensions)
 # 	@_[0] -> $music_dir
 # 	@_[1] -> current_depth (should start at 1)
@@ -270,7 +288,20 @@ for my $file (@file_list){
 
 	# Loop to add all the columns for $statement
 	for my $i (sort(keys %data)){
-		next if $i eq "MCDI"; #FIXME MCDI field creates issues
+		#print "$i -> $data{$i}\t";
+		#print "\n";
+		
+		#if ($i eq "MCDI"){
+		#	utf8::encode($data{$i});
+		#	detect_binary($data{$i});
+		#	print $data{$i}, "\n";
+		#	#print length($data{$i}), "\n";
+		#	for my $char (split("", $data{$i})){
+		#		printf("%s: 0x%X\n", $char, ord($char));
+		#	}
+		#}
+		
+		next if detect_binary($data{$i});#TODO detect_binary creates false positives, for example, LYRICS tag
 		$data{$i} =~ s/\"/\'\'/g;
 		$statement = $statement . "\"$i\" = \"";
 
@@ -294,7 +325,6 @@ for my $file (@file_list){
 	utf8::encode($statement);
 	$statement = $statement . "WHERE PATH = \"$file\";";
 
-	#FIXME MCDI tag is binary. This should be considered and handled in a secondary file
 	db_cmd($dbh, $statement, "Updated tags for $file");
 }
 
